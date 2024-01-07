@@ -1563,6 +1563,12 @@ const transfer = async (req, res) => {
                                             res.status(200).send(res_send);
                                         }
                                     } else {
+
+                                        let data_transfer = {amount, trans_fee, no_rek, no_hp, bpr_id}
+                                        let request_transfer_plus = await connect_axios(url_cms, 'CMS', 'trx/update/trfplus', data_transfer)
+                                        console.log("Tambah Transfer Harian");
+                                        console.log(request_transfer_plus);
+                                        
                                         //--berhasil dapat list product update atau insert ke db --//
                                         console.log("Success");
                                         res_send = {
@@ -1620,28 +1626,52 @@ const transfer = async (req, res) => {
                                     gl_amount_cr_2: trans_fee,
                                 }
                             }
-                            const request = await connect_axios(url_core, 'CORE', "transfer", data_core)
-                            let [results, metadata] = await db.sequelize.query(
-                                `UPDATE log_gateway SET messages_type = 'RESPONSE', rcode = ?, messages = ? WHERE no_rek = ? AND no_hp = ? AND bpr_id = ? AND amount = ? AND trans_fee = ? AND tgl_trans = ? AND rrn = ?`,
-                                {
-                                    replacements: [request.code, request.message, no_rek, no_hp, bpr_id, amount, trans_fee, tgl_trans, rrn],
-                                }
-                            );
-                            if (request.code !== "000") {
-                                console.log("failed gateway");
-                                console.log(request);
-                                res.status(200).send(request);
-                            } else {
-                                //--berhasil dapat list product update atau insert ke db --//
-                                console.log("Success");
+                            let data_status_core = {bpr_id}
+                            let status_core = await connect_axios(url_cms, 'CMS', 'trx/gl/gltranssbb', data_status_core)
+                            if (status_core.data.status == "0") {
+                                
+                                let data_hold_trans = {bpr_id, data:JSON.stringify(data_core)}
+                                let hold_transaction = await connect_axios(url_cms, 'CMS', 'trx/log/holdtrx', data_hold_trans)
+                                console.log("hold transaction");
+                                console.log(hold_transaction);
+        
                                 res_send = {
-                                    code: "000",
-                                    status: "ok",
-                                    message: "Success",
-                                    data: request.data,
+                                    code: "099",
+                                    status: "Failed",
+                                    message: "Gagal, Core SIGN OFF!!!",
+                                    data: null,
                                 }
                                 console.log(res_send);
                                 res.status(200).send(res_send);
+                            } else {
+                                const request = await connect_axios(url_core, 'CORE', "transfer", data_core)
+                                let [results, metadata] = await db.sequelize.query(
+                                    `UPDATE log_gateway SET messages_type = 'RESPONSE', rcode = ?, messages = ? WHERE no_rek = ? AND no_hp = ? AND bpr_id = ? AND amount = ? AND trans_fee = ? AND tgl_trans = ? AND rrn = ?`,
+                                    {
+                                        replacements: [request.code, request.message, no_rek, no_hp, bpr_id, amount, trans_fee, tgl_trans, rrn],
+                                    }
+                                );
+                                if (request.code !== "000") {
+                                    console.log("failed gateway");
+                                    console.log(request);
+                                    res.status(200).send(request);
+                                } else {
+                                    let data_transfer = {amount, trans_fee, no_rek, no_hp, bpr_id}
+                                    let request_transfer_min = await connect_axios(url_cms, 'CMS', 'trx/update/trfmin', data_transfer)
+                                    console.log("Kurang Transfer Harian");
+                                    console.log(request_transfer_min);
+                                    
+                                    //--berhasil dapat list product update atau insert ke db --//
+                                    console.log("Success");
+                                    res_send = {
+                                        code: "000",
+                                        status: "ok",
+                                        message: "Success",
+                                        data: request.data,
+                                    }
+                                    console.log(res_send);
+                                    res.status(200).send(res_send);
+                                }
                             }
                         }
                     }
